@@ -1,6 +1,10 @@
 #![no_std]
 #![no_main]
 
+mod display;
+mod message;
+mod state;
+
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_nrf::{
@@ -22,8 +26,10 @@ use embedded_graphics::{
     text::{Baseline, Text, TextStyleBuilder},
 };
 
+use crate::{display::display_task, message::publish_message_task};
+
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+async fn main(spawner: Spawner) {
     let p = embassy_nrf::init(Default::default());
 
     bind_interrupts!(struct Irqs {
@@ -69,5 +75,10 @@ async fn main(_spawner: Spawner) {
         .update_and_display_frame(&mut spi, &screen.buffer(), &mut delay)
         .expect("to work");
 
-    loop {}
+    spawner.spawn(display_task(epd7in5, spi, delay).unwrap());
+    spawner.spawn(publish_message_task().unwrap());
+
+    loop {
+        embassy_time::Timer::after_secs(1).await;
+    }
 }
