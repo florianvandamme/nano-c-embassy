@@ -25,6 +25,7 @@ embassy-time = { version = "0.5.1", features = ["defmt", "defmt-timestamp-uptime
 embedded-graphics = "0.8.2"
 embedded-hal-bus = "0.3.0"
 epd-waveshare = "0.6.0"
+heapless = "0.9.4"
 panic-probe = "1.0.0"
 
 [profile.release]

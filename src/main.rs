@@ -16,17 +16,14 @@ use embassy_nrf::{
 
 use embassy_time::Delay;
 use embedded_hal_bus::spi::ExclusiveDevice;
-use epd_waveshare::{epd7in5_v2::*, prelude::*};
+use epd_waveshare::{
+    epd7in5_v2::{Display7in5, Epd7in5},
+    prelude::WaveshareDisplay,
+};
 use panic_probe as _;
 
-use embedded_graphics::{
-    Drawable,
-    geometry::Point,
-    mono_font::MonoTextStyleBuilder,
-    text::{Baseline, Text, TextStyleBuilder},
-};
-
-use crate::{display::display_task, message::publish_message_task};
+use crate::display::display_task;
+use crate::message::publish_message_task;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
@@ -40,7 +37,7 @@ async fn main(spawner: Spawner) {
     let cs = Output::new(p.P1_02, Level::High, OutputDrive::Standard); // CS (P1.02) - D10
     let dc = Output::new(p.P0_27, Level::Low, OutputDrive::Standard); // DC (P0.27) - D9
     let rst = Output::new(p.P0_21, Level::Low, OutputDrive::Standard); // RST (P0.21) - D8
-    let _pwr = Output::new(p.P1_14, Level::High, OutputDrive::Standard); // PWR (P1.14) - D6
+    let pwr = Output::new(p.P1_14, Level::High, OutputDrive::Standard); // PWR (P1.14) - D6
 
     let mut config = Config::default();
     config.frequency = spim::Frequency::M4;
@@ -51,34 +48,17 @@ async fn main(spawner: Spawner) {
     let mut spi = ExclusiveDevice::new_no_delay(spim, cs).unwrap();
     let mut delay = Delay;
 
-    let mut epd7in5 = Epd7in5::new(&mut spi, busy, dc, rst, &mut delay, None).expect("To work.");
+    let mut epd7in5 = Epd7in5::new(&mut spi, busy, dc, rst, &mut delay, None).expect("to work");
 
     let mut screen = Display7in5::default();
-
-    let style = MonoTextStyleBuilder::new()
-        .font(&embedded_graphics::mono_font::ascii::FONT_6X10)
-        .text_color(Color::White)
-        .background_color(Color::Black)
-        .build();
-
-    let text_style = TextStyleBuilder::new().baseline(Baseline::Top).build();
-
-    let _ = Text::with_text_style(
-        "hello world from embassy!",
-        Point::new(10, 10),
-        style,
-        text_style,
-    )
-    .draw(&mut screen);
+    display::render_message(&mut screen, "hello world from embassy!");
 
     epd7in5
         .update_and_display_frame(&mut spi, &screen.buffer(), &mut delay)
         .expect("to work");
 
-    spawner.spawn(display_task(epd7in5, spi, delay).unwrap());
+    spawner.spawn(display_task(epd7in5, spi, delay, pwr).unwrap());
     spawner.spawn(publish_message_task().unwrap());
 
-    loop {
-        embassy_time::Timer::after_secs(1).await;
-    }
+    core::future::pending::<()>().await;
 }

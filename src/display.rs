@@ -27,21 +27,7 @@ type EpdDriver = Epd7in5<
     Delay,
 >;
 
-#[embassy_executor::task]
-pub async fn display_task(
-    mut screen: EpdDriver,
-    mut spi: ExclusiveDevice<Spim<'static>, Output<'static>, embedded_hal_bus::spi::NoDelay>,
-    mut delay: Delay,
-) {
-    DISPLAY_UPDATE.wait().await;
-
-    let message = {
-        let state = STATE.lock().await;
-
-        state.message
-    };
-
-    let mut display = Display7in5::default();
+pub fn render_message(screen: &mut Display7in5, message: &str) {
     let style = MonoTextStyleBuilder::new()
         .font(&embedded_graphics::mono_font::ascii::FONT_6X10)
         .text_color(Color::White)
@@ -50,14 +36,30 @@ pub async fn display_task(
 
     let text_style = TextStyleBuilder::new().baseline(Baseline::Top).build();
 
-    let _ =
-        Text::with_text_style(message, Point::new(10, 10), style, text_style).draw(&mut display);
+    let _ = Text::with_text_style(message, Point::new(10, 10), style, text_style).draw(screen);
+}
 
-    screen
-        .update_and_display_frame(&mut spi, &display.buffer(), &mut delay)
-        .expect("to work");
-
+#[embassy_executor::task]
+pub async fn display_task(
+    mut screen: EpdDriver,
+    mut spi: ExclusiveDevice<Spim<'static>, Output<'static>, embedded_hal_bus::spi::NoDelay>,
+    mut delay: Delay,
+    _pwr: Output<'static>,
+) {
     loop {
-        embassy_time::Timer::after_secs(10).await;
+        DISPLAY_UPDATE.wait().await;
+
+        let message = {
+            let state = STATE.lock().await;
+
+            state.message.clone()
+        };
+
+        let mut display = Display7in5::default();
+        render_message(&mut display, &message);
+
+        screen
+            .update_and_display_frame(&mut spi, &display.buffer(), &mut delay)
+            .expect("to work");
     }
 }
