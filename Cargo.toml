@@ -27,6 +27,7 @@ embedded-hal-bus = "0.3.0"
 epd-waveshare = "0.6.0"
 heapless = "0.9.4"
 panic-probe = "1.0.0"
+u8g2-fonts = { version = "0.9.1", features = ["embedded_graphics_textstyle"] }
 
 [profile.release]
 debug = 2

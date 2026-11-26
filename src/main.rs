@@ -16,10 +16,7 @@ use embassy_nrf::{
 
 use embassy_time::Delay;
 use embedded_hal_bus::spi::ExclusiveDevice;
-use epd_waveshare::{
-    epd7in5_v2::{Display7in5, Epd7in5},
-    prelude::WaveshareDisplay,
-};
+use epd_waveshare::{epd7in5_v2::Epd7in5, prelude::WaveshareDisplay};
 use panic_probe as _;
 
 use crate::display::display_task;
@@ -48,14 +45,7 @@ async fn main(spawner: Spawner) {
     let mut spi = ExclusiveDevice::new_no_delay(spim, cs).unwrap();
     let mut delay = Delay;
 
-    let mut epd7in5 = Epd7in5::new(&mut spi, busy, dc, rst, &mut delay, None).expect("to work");
-
-    let mut screen = Display7in5::default();
-    display::render_message(&mut screen, "hello world from embassy!");
-
-    epd7in5
-        .update_and_display_frame(&mut spi, &screen.buffer(), &mut delay)
-        .expect("to work");
+    let epd7in5 = Epd7in5::new(&mut spi, busy, dc, rst, &mut delay, None).expect("to work");
 
     spawner.spawn(display_task(epd7in5, spi, delay, pwr).unwrap());
     spawner.spawn(publish_message_task().unwrap());
