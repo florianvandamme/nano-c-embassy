@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
 
+mod debug;
 mod display;
-mod message;
 mod state;
 
 use defmt_rtt as _;
@@ -14,13 +14,13 @@ use embassy_nrf::{
     spim::{self, Config, Spim},
 };
 
-use embassy_time::Delay;
+use embassy_time::{Delay, Timer};
 use embedded_hal_bus::spi::ExclusiveDevice;
 use epd_waveshare::{epd7in5_v2::Epd7in5, prelude::WaveshareDisplay};
+use heapless::{String, format};
 use panic_probe as _;
 
-use crate::display::display_task;
-use crate::message::publish_message_task;
+use crate::{debug::publish_debug_message, display::display_task};
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
@@ -48,7 +48,14 @@ async fn main(spawner: Spawner) {
     let epd7in5 = Epd7in5::new(&mut spi, busy, dc, rst, &mut delay, None).expect("to work");
 
     spawner.spawn(display_task(epd7in5, spi, delay, pwr).unwrap());
-    spawner.spawn(publish_message_task().unwrap());
+    let mut i = 1;
 
-    core::future::pending::<()>().await;
+    loop {
+        Timer::after_secs(10).await;
+
+        let line: String<64> = format!("{}: Debug line from main loop", i).unwrap();
+        publish_debug_message(&line).await;
+
+        i += 1;
+    }
 }

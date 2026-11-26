@@ -17,12 +17,15 @@ use embedded_graphics::{
     primitives::{Primitive, PrimitiveStyleBuilder, Rectangle},
     text::{Baseline, Text, TextStyleBuilder, renderer::TextRenderer},
 };
+use heapless::{String, Vec};
 use u8g2_fonts::{U8g2TextStyle, fonts::u8g2_font_open_iconic_embedded_2x_t};
 
 use crate::{
     display::Font::IconicEmbedded,
     state::{DISPLAY_UPDATE, STATE},
 };
+
+const STATUS_BAR_HEIGHT: u32 = 26;
 
 type EpdDriver = Epd7in5<
     ExclusiveDevice<Spim<'static>, Output<'static>, embedded_hal_bus::spi::NoDelay>,
@@ -31,8 +34,6 @@ type EpdDriver = Epd7in5<
     Output<'static>,
     Delay,
 >;
-
-const MESSAGE_POSITION: Point = Point::new(10, 10);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Font {
@@ -84,18 +85,17 @@ pub async fn display_task(
     loop {
         DISPLAY_UPDATE.wait().await;
 
-        let message = {
+        let messages = {
             let state = STATE.lock().await;
 
-            state.message.clone()
+            state.messages.clone()
         };
 
         let mut display = Display7in5::default();
 
-        render_message(&mut display, &message, MESSAGE_POSITION, None);
-
         // @TODO:: Get from state
         draw_status_bar(true, &mut display);
+        draw_debug_window(messages, &mut display);
 
         screen
             .update_and_display_frame(&mut spi, &display.buffer(), &mut delay)
@@ -109,7 +109,7 @@ fn draw_status_bar(is_connected: bool, display: &mut Display7in5) {
         .stroke_width(1)
         .build();
 
-    let _ = Rectangle::new(Point::new(0, 0), Size::new(800, 26))
+    let _ = Rectangle::new(Point::new(0, 0), Size::new(800, STATUS_BAR_HEIGHT))
         .into_styled(style)
         .draw(display);
 
@@ -118,4 +118,32 @@ fn draw_status_bar(is_connected: bool, display: &mut Display7in5) {
     }
 
     render_message(display, &"I", Point::new(780, 4), Some(IconicEmbedded));
+}
+
+fn draw_debug_window(messages: Vec<String<64>, 5>, display: &mut Display7in5) {
+    let height: u32 = 66;
+    let width: u32 = 200;
+    let offset_top: i32 = (STATUS_BAR_HEIGHT + 4) as i32;
+    let offset_left: i32 = 600;
+
+    let style = PrimitiveStyleBuilder::new()
+        .stroke_color(Color::White)
+        .stroke_width(1)
+        .build();
+
+    let _ = Rectangle::new(
+        Point::new(offset_left, offset_top as i32),
+        Size::new(width, height),
+    )
+    .into_styled(style)
+    .draw(display);
+
+    for (i, message) in messages.iter().enumerate() {
+        render_message(
+            display,
+            &message,
+            Point::new(offset_left + 8, offset_top + 8 + (10 * i) as i32),
+            None,
+        );
+    }
 }
