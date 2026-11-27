@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+mod clock;
 mod debug;
 mod display;
 mod state;
